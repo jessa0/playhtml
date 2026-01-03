@@ -22,6 +22,13 @@ function compareKeys(
   };
 }
 
+function supabaseError(): Response {
+  return new Response(JSON.stringify({ error: "DB not enabled" }), {
+    status: 404,
+    headers: { "content-type": "application/json" },
+  });
+}
+
 /**
  * AdminHandler provides endpoints for inspecting and managing PlayHTML rooms.
  *
@@ -124,6 +131,8 @@ export class AdminHandler {
   private async handleAdminInspect(request: Request): Promise<Response> {
     const authError = this.checkAdminAuth(request);
     if (authError) return authError;
+
+    if (supabase == null) return supabaseError();
 
     try {
       const subscribers = await this.context.getSubscribers();
@@ -229,6 +238,8 @@ export class AdminHandler {
     const authError = this.checkAdminAuth(request);
     if (authError) return authError;
 
+    if (supabase == null) return supabaseError();
+
     try {
       // Get raw document from Supabase
       const { data, error } = await supabase
@@ -294,6 +305,8 @@ export class AdminHandler {
   private async handleAdminLiveCompare(request: Request): Promise<Response> {
     const authError = this.checkAdminAuth(request);
     if (authError) return authError;
+
+    if (supabase == null) return supabaseError();
 
     try {
       // Method 1: Direct Y.Doc approach (what admin console uses)
@@ -390,6 +403,8 @@ export class AdminHandler {
     const authError = this.checkAdminAuth(request);
     if (authError) return authError;
 
+    if (supabase == null) return supabaseError();
+
     try {
       const liveYDoc = this.context.document;
       const base64 = encodeDocToBase64(liveYDoc);
@@ -424,6 +439,8 @@ export class AdminHandler {
   ): Promise<Response> {
     const authError = this.checkAdminAuth(request);
     if (authError) return authError;
+
+    if (supabase == null) return supabaseError();
 
     try {
       // Load snapshot from DB
@@ -504,20 +521,22 @@ export class AdminHandler {
       replaceDocState(liveYDoc, editedData);
 
       // Persist immediately to database
-      const base64 = encodeDocToBase64(liveYDoc);
-      console.log(`[Admin] Encoded content length: ${base64.length}`);
+      if (supabase != null) {
+        const base64 = encodeDocToBase64(liveYDoc);
+        console.log(`[Admin] Encoded content length: ${base64.length}`);
 
-      const { error } = await supabase.from("documents").upsert(
-        {
-          name: this.context.name,
-          document: base64,
-        },
-        { onConflict: "name" }
-      );
+        const { error } = await supabase.from("documents").upsert(
+          {
+            name: this.context.name,
+            document: base64,
+          },
+          { onConflict: "name" }
+        );
 
-      if (error) {
-        console.error(`[Admin] Database error:`, error);
-        throw new Error(error.message);
+        if (error) {
+          console.error(`[Admin] Database error:`, error);
+          throw new Error(error.message);
+        }
       }
 
       console.log(`[Admin] Successfully saved to database and live doc`);
@@ -707,19 +726,21 @@ export class AdminHandler {
       }
 
       // Persist the updated live doc to database
-      const base64 = encodeDocToBase64(yDoc);
-      const { error: saveError } = await supabase.from("documents").upsert(
-        {
-          name: this.context.name,
-          document: base64,
-        },
-        { onConflict: "name" }
-      );
-
-      if (saveError) {
-        throw new Error(
-          `Failed to save cleaned document: ${saveError.message}`
+      if (supabase != null) {
+        const base64 = encodeDocToBase64(yDoc);
+        const { error: saveError } = await supabase.from("documents").upsert(
+          {
+            name: this.context.name,
+            document: base64,
+          },
+          { onConflict: "name" }
         );
+
+        if (saveError) {
+          throw new Error(
+            `Failed to save cleaned document: ${saveError.message}`
+          );
+        }
       }
 
       return new Response(

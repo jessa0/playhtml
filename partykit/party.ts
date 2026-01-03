@@ -56,23 +56,25 @@ export class PartyServer extends YServer {
     const doc = new Y.Doc();
 
     // Load the document from the database
-    const { data, error } = await supabase
-      .from("documents")
-      .select("document")
-      .eq("name", this.name)
-      .maybeSingle();
+    if (supabase != null) {
+      const { data, error } = await supabase
+        .from("documents")
+        .select("document")
+        .eq("name", this.name)
+        .maybeSingle();
 
-    if (error) {
-      throw new Error(error.message);
-    }
+      if (error) {
+        throw new Error(error.message);
+      }
 
-    if (data) {
-      // If the document exists on the database,
-      // apply it to the Yjs document
-      Y.applyUpdate(
-        doc,
-        new Uint8Array(Buffer.from(data.document, "base64"))
-      );
+      if (data) {
+        // If the document exists on the database,
+        // apply it to the Yjs document
+        Y.applyUpdate(
+          doc,
+          new Uint8Array(Buffer.from(data.document, "base64"))
+        );
+      }
     }
   }
 
@@ -128,21 +130,23 @@ export class PartyServer extends YServer {
     );
 
     // Save the document to the database
-    const { data: _data, error } = await supabase.from("documents").upsert(
-      {
-        name: this.name,
-        document: base64Document,
-      },
-      { onConflict: "name" }
-    );
-
-    if (error) {
-      console.error(
-        `[PartyServer] Autosave failed for room ${this.name}:`,
-        error
+    if (supabase != null) {
+      const { data: _data, error } = await supabase.from("documents").upsert(
+        {
+          name: this.name,
+          document: base64Document,
+        },
+        { onConflict: "name" }
       );
-    } else {
-      console.log(`[PartyServer] Autosave succeeded for room ${this.name}`);
+
+      if (error) {
+        console.error(
+          `[PartyServer] Autosave failed for room ${this.name}:`,
+          error
+        );
+      } else {
+        console.log(`[PartyServer] Autosave succeeded for room ${this.name}`);
+      }
     }
   }
 
@@ -257,24 +261,28 @@ export class PartyServer extends YServer {
       const documentSize = updatedBase64.length;
 
       // Save to database
-      console.log(`[Restore Snapshot] Saving snapshot to database...`);
-      const { error: saveError } = await supabase.from("documents").upsert(
-        {
-          name: this.name,
-          document: updatedBase64,
-        },
-        { onConflict: "name" }
-      );
-
-      if (saveError) {
-        console.error(
-          `[Restore Snapshot] Database save failed:`,
-          saveError.message,
-          saveError
+      if (supabase != null) {
+        console.log(`[Restore Snapshot] Saving snapshot to database...`);
+        const { error: saveError } = await supabase.from("documents").upsert(
+          {
+            name: this.name,
+            document: updatedBase64,
+          },
+          { onConflict: "name" }
         );
-        throw new Error(`Failed to save snapshot: ${saveError.message}`);
+
+        if (saveError) {
+          console.error(
+            `[Restore Snapshot] Database save failed:`,
+            saveError.message,
+            saveError
+          );
+          throw new Error(`Failed to save snapshot: ${saveError.message}`);
+        }
+        console.log(
+          `[Restore Snapshot] Successfully saved snapshot to database`
+        );
       }
-      console.log(`[Restore Snapshot] Successfully saved snapshot to database`);
 
       // Reload the live server from the snapshot
       console.log(`[Restore Snapshot] Reloading live server from snapshot...`);
@@ -1034,24 +1042,28 @@ export class PartyServer extends YServer {
       }
 
       // Save to database
-      console.log(`[Hard Reset] Saving fresh doc to database...`);
-      const { error: saveError } = await supabase.from("documents").upsert(
-        {
-          name: this.name,
-          document: freshBase64,
-        },
-        { onConflict: "name" }
-      );
-
-      if (saveError) {
-        console.error(
-          `[Hard Reset] Database save failed:`,
-          saveError.message,
-          saveError
+      if (supabase != null) {
+        console.log(`[Hard Reset] Saving fresh doc to database...`);
+        const { error: saveError } = await supabase.from("documents").upsert(
+          {
+            name: this.name,
+            document: freshBase64,
+          },
+          { onConflict: "name" }
         );
-        throw new Error(`Failed to save reset document: ${saveError.message}`);
+
+        if (saveError) {
+          console.error(
+            `[Hard Reset] Database save failed:`,
+            saveError.message,
+            saveError
+          );
+          throw new Error(
+            `Failed to save reset document: ${saveError.message}`
+          );
+        }
+        console.log(`[Hard Reset] Successfully saved fresh doc to database`);
       }
-      console.log(`[Hard Reset] Successfully saved fresh doc to database`);
 
       // Reload the live server from the new snapshot
       console.log(`[Hard Reset] Reloading live server from snapshot...`);
